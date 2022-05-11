@@ -1,7 +1,13 @@
 # TLS_PowerShell_Standalone
  PowerShell script to apply TLS 1.2 settings for Windows servers
 
- # Usage
+ # Usage - Batch scripts
+
+ For ease of use, download the entire repository, right click the applyTLSSettings.bat batch file, and select 'Run as administrator.' This will create the c:\scripts\TLS directory structure for you, copy all relevant files to that directory and apply the changes. When the script completes, reboot the server for the changes to take affect.
+
+ To revert TLS settings using the included batch files (recommended), navigate to C:\scripts\TLS, right click the revertTLSSettings.bat batch file and select 'Run as administrator.' This will restore the backups that were created when initially running the scripts.
+
+# Usage - Standalone PS1 script file
 
  To apply TLS settings to the local computer, run the following command and then reboot the server:
 
@@ -33,3 +39,9 @@ The script has also been verified to run on the following versions of PowerShell
     - PowerShell 5.1
 
 Note that PowerShell 7 is untested at this time.
+
+# Note for SCCM Clients
+
+Note that if the script detects the SCCM/MECM client installed, it will also update the 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' key with various settings. These values flag the server as needing a reboot in the SCCM console, but it will not cause an automatic reboot.
+
+For SCCM deployments, this script has been tested as both a stand-alone script (via SCCM Rn Scripts function) as well as tested via a Package/Task Sequence deployment.
