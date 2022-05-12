@@ -134,41 +134,6 @@ elseif ((Get-ItemProperty -Path 'HKLM:\System\CityNationalBank\TLSControls' -Err
     }
     #endregion
 
-    #region Configure Key Exchange Algorithms
-    $keyPath = "SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\KeyExchangeAlgorithms"
-    $testKeyPath = Test-Path "HKLM:\$keyPath" -ErrorAction SilentlyContinue
-    if (-not $testKeyPath) { New-Item "HKLM:\$keyPath" -Force }
-    $keyAlgorithms = "Diffie-Hellman", "ECDH", "PKCS"
-
-    $keyAlgorithms | % {
-        $testKeyPathExist = Test-Path "HKLM:\$keyPath\$_" -ErrorAction SilentlyContinue
-        $testKeySettingExist = Get-ItemProperty "HKLM:\$keyPath\$_" -Name "Enabled" -ErrorAction SilentlyContinue
-
-        if (-not $testKeyPathExist) {
-            $algorithmKey = (Get-Item HKLM:\).OpenSubKey($keyPath, $true)
-            $algorithmKey.CreateSubKey($_)
-            $algorithmKey.Close()
-        }
-
-        if (-not $testKeySettingExist) {
-            New-ItemProperty -Path "HKLM:\$keyPath\$_" -Name 'Enabled' -Value 0xffffffff -PropertyType DWord -Force
-            if ($_ -eq "Diffie-Hellman") { New-ItemProperty -Path "HKLM:\$keyPath\$_" -Name "ServerMinKeyBitLength" -Value 0x0000800 -PropertyType DWord -Force }
-        }
-        else {
-            Set-ItemProperty -Path "HKLM:\$keyPath\$_" -Name 'Enabled' -Value 0xffffffff -Force
-            if ($_ -eq "Diffie-Hellman") { 
-                $testServerMinKeyBitLength = Get-ItemProperty "HKLM:\$keyPath\$_" -Name "ServerMinKeyBitLength" -ErrorAction SilentlyContinue
-                if (-not $testServerMinKeyBitLength) {
-                    New-ItemProperty -Path "HKLM:\$keyPath\$_" -Name "ServerMinKeyBitLength" -Value 0x00000800 -PropertyType DWord -Force
-                }
-                else {
-                    Set-ItemProperty -Path "HKLM:\$keyPath\$_" -Name "ServerMinKeyBitLength" -Value 0x00000800 -Force
-                }
-            }
-        }
-    }
-    #endregion
-
     #region Configure Protocols
     $protoPath = "SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols"
     $testProtoPath = Test-Path "HKLM:\$protoPath" -ErrorAction SilentlyContinue
