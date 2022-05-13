@@ -11,7 +11,7 @@
 
  To apply TLS settings to the local computer, run the following command and then reboot the server:
 
-    PS> .\ApplyTLSRegistrySettings.bat
+    PS> .\ApplyTLSRegistrySettings.ps1
 
 The script will automatically create backups (.reg files) of existing settings prior to applying the changes. The backup .reg files will be stored in the C:\scripts\TLS\backup directory. These files MUST remain at this location for the revert function to operate properly.
 
