@@ -44,4 +44,4 @@ Note that PowerShell 7 is untested at this time.
 
 Note that if the script detects the SCCM/MECM client installed, it will also update the 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' key with various settings. These values flag the server as needing a reboot in the SCCM console, but it will not cause an automatic reboot.
 
-For SCCM deployments, this script has been tested as both a stand-alone script (via SCCM Rn Scripts function) as well as tested via a Package/Task Sequence deployment.
+For SCCM deployments, this script has been tested as both a stand-alone script (via SCCM Run Scripts function) as well as tested via a Package/Task Sequence deployment.
