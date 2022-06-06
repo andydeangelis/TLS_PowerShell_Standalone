@@ -33,6 +33,7 @@ $dateTime = Get-Date -f "MM-dd-yyy_HH-mm-ss"
 if ($RestoreToDefaults) {
 
     Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /f }
+    Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CityNationalBank\tls" /f }
 
     $testSMSPath = Test-Path 'HKLM:\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' -ErrorAction SilentlyContinue
     $testRebootByKey = Get-ItemProperty -path 'HKLM:\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' -name 'RebootBy' -ErrorAction SilentlyContinue
