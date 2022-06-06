@@ -1,27 +1,43 @@
+<#
+.SYNOPSIS
+    Script used to apply/revert PCI-DSS compliant TLS controls.
+.DESCRIPTION
+    This script applies PCI-DSS compliant TLS controls to the local Windows host. In addition to disabling all protocols less than TLS 1.2,
+    it also disables weak Ciphers and Hashes. Note that after running the script, a reboot is necessary.
+
+    Additionally, if the SCCM client is detected in the registry, the local client will be flagged as needing a reboot in the SCCM console (no reboot
+    will be performed automatically).
+.PARAMETER RestoreToDefaults
+    This optional parameter restores all SSL/TLS setting to factory defaults. Note that after running the script, a reboot is necessary.
+.EXAMPLE
+    C:\PS> .\ApplyTLSRegistrySettings.ps1
+    ### This example applies all PCI-DSS compliant TLS controls to the local system.
+
+    C:\PS> .\ApplyTLSRegistrySettings.ps1 -RestoreToDefaults
+    ### This example restores all TLS/SSL settings to their factory defaults
+.NOTES
+    Author: Andy DeAngelis
+    Date:   June 6, 2022    
+#>
+
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $false)]
     [switch]
-    $RestoreBackup
+    $RestoreToDefaults
 )
 
 If (-not (Test-Path ./reports -ea SilentlyContinue)) { New-Item ./reports -ItemType Directory -Force }
 $dateTime = Get-Date -f "MM-dd-yyy_HH-mm-ss"
 
-if ($RestoreBackup) {
+if ($RestoreToDefaults) {
 
-    $files = Get-ChildItem "C:\scripts\TLS\backup" | ? { $_.Extension -like '.reg' }
+    Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /f }
 
-    if ($files) {
-        Invoke-Command { reg delete "hkey_local_machine\SOFTWARE\Microsoft\.NETFramework\v4.0.30319" /f }
-        Invoke-Command { reg delete "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319" /f }
-        Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /f }
-        Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CityNationalBank\TLSControls" /f }
-
-        $testSMSPath = Test-Path 'HKLM:\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' -ErrorAction SilentlyContinue
-        $testRebootByKey = Get-ItemProperty -path 'HKLM:\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' -name 'RebootBy' -ErrorAction SilentlyContinue
-        if ($testSMSPath -and (-not($testRebootByKey))) {    
-            $regFile = 'Windows Registry Editor Version 5.00
+    $testSMSPath = Test-Path 'HKLM:\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' -ErrorAction SilentlyContinue
+    $testRebootByKey = Get-ItemProperty -path 'HKLM:\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' -name 'RebootBy' -ErrorAction SilentlyContinue
+    if ($testSMSPath -and (-not($testRebootByKey))) {    
+        $regFile = 'Windows Registry Editor Version 5.00
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData]
 
@@ -34,18 +50,10 @@ if ($RestoreBackup) {
 "PreferredRebootWindowTypes"=hex(7):34,00,00,00,00,00
 "GraceSeconds"=dword:00000000'
 
-            $regfile | Out-file sccmReboot.reg
-            Invoke-Command { reg import .\sccmReboot.reg }
-        }
+        $regfile | Out-file sccmReboot.reg
+        Invoke-Command { reg import .\sccmReboot.reg }
+    }
 
-        $files | % {
-            $fileName = $_.FullName
-            Invoke-Command { reg import $fileName }
-        } 
-    }
-    else {
-        Write-Host "No registry backup files found. Unable to restore settings." -ForegroundColor Red   
-    }
 }
 elseif ((Get-ItemProperty -Path 'HKLM:\System\CityNationalBank\TLSControls' -ErrorAction SilentlyContinue).TLSControlsApplied -ne 1) {
 
@@ -131,6 +139,41 @@ elseif ((Get-ItemProperty -Path 'HKLM:\System\CityNationalBank\TLSControls' -Err
 
         if (-not $testHashSettingExist) { New-ItemProperty -Path "HKLM:\$hashPath\$_" -Name 'Enabled' -Value 0xffffffff -PropertyType DWord -Force }
         else { Set-ItemProperty -Path "HKLM:\$hashPath\$_" -Name 'Enabled' -Value 0xffffffff -Force }
+    }
+    #endregion
+
+    #region Configure Key Exchange Algorithms
+    $keyPath = "SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\KeyExchangeAlgorithms"
+    $testKeyPath = Test-Path "HKLM:\$keyPath" -ErrorAction SilentlyContinue
+    if (-not $testKeyPath) { New-Item "HKLM:\$keyPath" -Force }
+    $keyAlgorithms = "Diffie-Hellman", "ECDH", "PKCS"
+
+    $keyAlgorithms | % {
+        $testKeyPathExist = Test-Path "HKLM:\$keyPath\$_" -ErrorAction SilentlyContinue
+        $testKeySettingExist = Get-ItemProperty "HKLM:\$keyPath\$_" -Name "Enabled" -ErrorAction SilentlyContinue
+
+        if (-not $testKeyPathExist) {
+            $algorithmKey = (Get-Item HKLM:\).OpenSubKey($keyPath, $true)
+            $algorithmKey.CreateSubKey($_)
+            $algorithmKey.Close()
+        }
+
+        if (-not $testKeySettingExist) {
+            New-ItemProperty -Path "HKLM:\$keyPath\$_" -Name 'Enabled' -Value 0xffffffff -PropertyType DWord -Force
+            if ($_ -eq "Diffie-Hellman") { New-ItemProperty -Path "HKLM:\$keyPath\$_" -Name "ServerMinKeyBitLength" -Value 0x0000800 -PropertyType DWord -Force }
+        }
+        else {
+            Set-ItemProperty -Path "HKLM:\$keyPath\$_" -Name 'Enabled' -Value 0xffffffff -Force
+            if ($_ -eq "Diffie-Hellman") { 
+                $testServerMinKeyBitLength = Get-ItemProperty "HKLM:\$keyPath\$_" -Name "ServerMinKeyBitLength" -ErrorAction SilentlyContinue
+                if (-not $testServerMinKeyBitLength) {
+                    New-ItemProperty -Path "HKLM:\$keyPath\$_" -Name "ServerMinKeyBitLength" -Value 0x00000800 -PropertyType DWord -Force
+                }
+                else {
+                    Set-ItemProperty -Path "HKLM:\$keyPath\$_" -Name "ServerMinKeyBitLength" -Value 0x00000800 -Force
+                }
+            }
+        }
     }
     #endregion
 
