@@ -32,7 +32,7 @@ $dateTime = Get-Date -f "MM-dd-yyy_HH-mm-ss"
 
 if ($RestoreToDefaults) {
 
-    $regFolders = Get-ChildItem "C:\scripts\TLS\backup" -ErrorAction SilentlyContinue
+    $regFolders = Get-ChildItem "C:\scripts\TLS\backup" -ErrorAction SilentlyContinue | ? { $_.PSIsContainer }
 
     # If previous registry backups exist, build the menu to select the date of restore.
     if ($regFolders) { 
@@ -45,9 +45,11 @@ if ($RestoreToDefaults) {
                 $i++
             }
 
+            Write-Host "`n`nR: Restore System Defaults`n`n"
+
             if ($folderMessage) { Write-Host $folderMessage -ForegroundColor Red }
-            $selectionNum = Read-Host "Enter the number for the Date/time of rollback (Ctrl + C to cancel)"
-            $selectFolder = $regFolders[$selectionNum - 1]
+            $selectionNum = Read-Host "Enter the number for the Date/time of rollback or press 'R' to restore to system defaults (Ctrl + C to cancel)"
+            if ($selectionNum -eq 'r') { $selectFolder = 'r' } else { $selectFolder = $regFolders[$selectionNum - 1] }
             if (-not $selectFolder) { $folderMessage = "`nInvalid selection.`n" }
         } while (-not $selectFolder)
 
@@ -63,12 +65,34 @@ if ($RestoreToDefaults) {
             exit
         }
 
+        if ($selectFolder -eq 'R') {
+            Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /f }
+            Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CityNationalBank\TLSControls" /f }    
+        }
+        else {
+            Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /f }
+            Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CityNationalBank\TLSControls" /f }
+
+            $regFiles = Get-ChildItem $selectFolder.FullName | ? { $_.Extension -eq ".reg" }
+
+            $regFiles | % { Invoke-Command { reg import $_.FullName } }
+        }
+    }
+    else {
+        $validate1 = $(Write-Host "No backups found. Are you sure you want to revert TLS to the system defaults (Y/N)? " -ForegroundColor Red -NoNewline; Read-Host)
+        if (($validate1 -ne 'Y') -or ($validate1 -ne 'y')) { 
+            Write-Host "Invalid entry! Exiting script without applying changes." -ForegroundColor Red
+            exit
+        }
+
+        $validate2 = $(Write-Host "Are you REALLY, REALLY sure you want to revert TLS to the system defaults (Y/N)? " -ForegroundColor Red -NoNewline; Read-Host)
+        if (($validate2 -ne 'Y') -or ($validate2 -ne 'y')) { 
+            Write-Host "Invalid entry! Exiting script without applying changes." -ForegroundColor Red
+            exit
+        }
+
         Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" /f }
         Invoke-Command { reg delete "hkey_local_machine\SYSTEM\CityNationalBank\TLSControls" /f }
-
-        $regFiles = Get-ChildItem $selectFolder.FullName | ? { $_.Extension -eq ".reg" }
-
-        $regFiles | % { Invoke-Command { reg import $_.FullName } }
     }
 
     $testSMSPath = Test-Path 'HKLM:\SOFTWARE\Microsoft\SMS\Mobile Client\Reboot Management\RebootData' -ErrorAction SilentlyContinue
