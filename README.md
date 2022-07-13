@@ -5,7 +5,7 @@
 
  For ease of use, download the entire repository, right click the applyTLSSettings.bat batch file, and select 'Run as administrator.' This will create the c:\scripts\TLS directory structure for you, copy all relevant files to that directory and apply the changes. When the script completes, reboot the server for the changes to take affect.
 
- To revert TLS settings using the included batch files (recommended), navigate to C:\scripts\TLS, right click the revertTLSSettings.bat batch file and select 'Run as administrator.' This will restore the backups that were created when initially running the scripts.
+ To revert TLS settings using the included batch files (recommended), navigate to C:\scripts\TLS, right click the revertTLSSettings.bat batch file and select 'Run as administrator.' Follow the on-screen instructions to revert your TLS settings. Note that if no registry backup files are found in the C:\scripts\TLS\backups directory, the rollback process will reset all TLS settings to their defaults.
 
 # Usage - Standalone PS1 script file
 
